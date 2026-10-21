@@ -90,4 +90,6 @@ export const sendMessage = async (
       data: message,
     });
   } catch (err) {
- 
+    next(err);
+  }
+};
