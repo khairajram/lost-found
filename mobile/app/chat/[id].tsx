@@ -45,50 +45,63 @@ export default function ChatScreen() {
   const cleanChatId = id || 'chat-match-301';
   const matchId = cleanChatId.replace('chat-', '');
 
+  const [isSending, setIsSending] = useState(false);
+
   useEffect(() => {
     // Load match details
     matchService.getMatchById(matchId).then((m) => {
       if (m) setMatch(m);
     });
 
-    // Load initial messages
+    // Load initial messages and deduplicate by _id
     chatService.getMessages(cleanChatId).then((msgs) => {
-      setMessages(msgs);
+      const seen = new Set<string>();
+      const unique = msgs.filter((m) => {
+        if (!m._id || seen.has(m._id)) return false;
+        seen.add(m._id);
+        return true;
+      });
+      setMessages(unique);
     });
   }, [cleanChatId, matchId]);
 
   const handleSendMessage = async (text: string, imageUri?: string) => {
-    if (!user) return;
-    const newMsg = await chatService.sendMessage(cleanChatId, text, user, imageUri);
-    setMessages((prev) => [...prev, newMsg]);
+    if (!user || isSending) return;
+    setIsSending(true);
+    try {
+      const newMsg = await chatService.sendMessage(cleanChatId, text, user, imageUri);
+      setMessages((prev) => (prev.some((m) => m._id === newMsg._id) ? prev : [...prev, newMsg]));
 
-    // Scroll to bottom
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+      // Scroll to bottom
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
 
-    // Auto reply simulation after 1.5 seconds if sent by User A
-    if (user.email === 'alex@example.com') {
-      setIsTyping(true);
-      setTimeout(async () => {
-        setIsTyping(false);
-        const reply = await chatService.sendMessage(
-          cleanChatId,
-          "Sounds great! I will have the phone with me at the Science Center front desk. See you then!",
-          {
-            _id: 'user-b-456',
-            name: 'Sarah Chen',
-            email: 'sarah@example.com',
-            isVerified: true,
-            createdAt: '',
-            updatedAt: '',
-          }
-        );
-        setMessages((prev) => [...prev, reply]);
-        setTimeout(() => {
-          flatListRef.current?.scrollToEnd({ animated: true });
-        }, 100);
-      }, 2000);
+      // Auto reply simulation after 1.5 seconds if sent by User A
+      if (user.email === 'alex@example.com') {
+        setIsTyping(true);
+        setTimeout(async () => {
+          setIsTyping(false);
+          const reply = await chatService.sendMessage(
+            cleanChatId,
+            "Sounds great! I will have the phone with me at the Science Center front desk. See you then!",
+            {
+              _id: 'user-b-456',
+              name: 'Sarah Chen',
+              email: 'sarah@example.com',
+              isVerified: true,
+              createdAt: '',
+              updatedAt: '',
+            }
+          );
+          setMessages((prev) => (prev.some((m) => m._id === reply._id) ? prev : [...prev, reply]));
+          setTimeout(() => {
+            flatListRef.current?.scrollToEnd({ animated: true });
+          }, 100);
+        }, 2000);
+      }
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -141,7 +154,7 @@ export default function ChatScreen() {
         <FlatList
           ref={flatListRef}
           data={messages}
-          keyExtractor={(item) => item._id}
+          keyExtractor={(item, index) => `${item._id || (item as any).id || 'msg'}-${index}`}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (

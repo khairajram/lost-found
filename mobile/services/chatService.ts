@@ -5,6 +5,9 @@ import { matchService } from './matchService';
 
 let inMemoryMessages: Record<string, ChatMessage[]> = { ...INITIAL_MESSAGES };
 
+const createUniqueMessageId = () =>
+  `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
 export const chatService = {
   async getConversations(currentUserId: string): Promise<ChatConversation[]> {
     try {
@@ -89,7 +92,7 @@ export const chatService = {
       const raw = res.data?.data || res.data;
       if (Array.isArray(raw)) {
         const messages: ChatMessage[] = raw.map((m: any) => ({
-          _id: m._id || m.id || `msg-${Math.random()}`,
+          _id: m._id || m.id || createUniqueMessageId(),
           chatId: m.chatId || m.conversationId || chatId,
           senderId: m.senderId || m.sender?.id || m.sender?._id || 'unknown',
           senderName: m.senderName || m.sender?.name || 'User',
@@ -124,7 +127,7 @@ export const chatService = {
       });
       const m = res.data?.data || res.data;
       const formatted: ChatMessage = {
-        _id: m?._id || m?.id || `msg-${Date.now()}`,
+        _id: m?._id || m?.id || createUniqueMessageId(),
         chatId: m?.chatId || m?.conversationId || chatId,
         senderId: m?.senderId || senderId,
         senderName: m?.senderName || m?.sender?.name || sender.name || 'User',
@@ -141,7 +144,7 @@ export const chatService = {
       return formatted;
     } catch {
       const newMsg: ChatMessage = {
-        _id: `msg-${Date.now()}`,
+        _id: createUniqueMessageId(),
         chatId,
         senderId,
         senderName: sender.name || 'User',
